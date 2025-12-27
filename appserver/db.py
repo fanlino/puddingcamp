@@ -15,7 +15,7 @@ def create_engine(dsn: str):
 
 def create_session(async_engine: AsyncEngine | None = None):
     if async_engine is None:
-        async_engine = create_engine()
+        async_engine = create_engine(DSN)
     return async_sessionmaker(async_engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
 
 
@@ -23,7 +23,8 @@ async def use_session():
     async with async_session_factory() as session:
         yield session
 
+DSN = "sqlite+aiosqlite:///./local.db"
 
-engine = create_engine()
+engine = create_engine(DSN)
 
 async_session_factory = create_session()
