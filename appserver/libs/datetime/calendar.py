@@ -2,6 +2,13 @@ from datetime import date, timedelta
 
 
 def get_start_weekday_of_month(year, month):
+    """
+    월의 시작 요일을 가져옴(월요일=0~일요일=6
+    >>> get_start_weekday_of_month(2024, 12)
+    6
+    >>> get_start_weekday_of_month(2025, 2)
+    5
+    """
     result = date(year, month, 1)
     return result.weekday()
 
