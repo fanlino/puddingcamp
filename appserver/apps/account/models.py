@@ -1,8 +1,9 @@
+import string
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlmodel import SQLModel, Field, Relationship, func, Column, AutoString
-from pydantic import EmailStr, AwareDatetime
+from pydantic import EmailStr, AwareDatetime, model_validator
 from sqlalchemy import UniqueConstraint
 from sqlalchemy_utc import UtcDateTime
 
@@ -17,7 +18,7 @@ class User(SQLModel, table=True):
     )
 
     id: int = Field(default=None, primary_key=True)
-    username: str = Field(max_length=40, description="사용자 계정 ID")
+    username: str = Field(min_length=4, max_length=40, description="사용자 계정 ID")
     email: EmailStr = Field(unique=True, max_length=128, description="사용자 이메일")
     display_name: str = Field(max_length=40, description="사용자 표시 이름")
     password: str = Field(max_length=128, description="사용자 비밀번호")
@@ -47,6 +48,14 @@ class User(SQLModel, table=True):
             "onupdate": lambda: datetime.now(timezone.utc),
         },
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def generate_display_name(cls, data: dict) -> dict:
+        if not data.get("display_name"):
+            import random
+            data["display_name"] = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+        return data
 
 
 class OAuthAccount(SQLModel, table=True):
