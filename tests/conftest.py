@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
+from appserver.apps.account.utils import hash_password
 from appserver.db import create_engine, create_session, use_session
 from appserver.app import include_routers
 from appserver.apps.account import models as account_models
@@ -52,7 +53,7 @@ def client(fastapi_app: FastAPI):
 async def host_user(db_session: AsyncSession):
     user = account_models.User(
         username="test",
-        password="test",
+        hashed_password=hash_password("testtest"),
         email="test@example.com",
         display_name="test",
         is_host=True,

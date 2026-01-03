@@ -1,11 +1,20 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select, func
 from sqlalchemy.exc import IntegrityError
-from .exceptions import DuplicatedUsernameError, DuplicatedEmailError
+from .exceptions import DuplicatedUsernameError, DuplicatedEmailError, PasswordMismatchError, UserNotFoundError
 
 from appserver.db import DbSessionDep
 from .models import User
-from .schemas import SignupPayload, UserOut
+from .schemas import SignupPayload, UserOut, LoginPayload
+
+from fastapi.responses import JSONResponse
+from .utils import (
+    verify_password,
+    create_access_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+)
 
 router = APIRouter(prefix="/account")
 
@@ -20,6 +29,7 @@ async def user_detail(username: str, session: DbSessionDep) -> User:
         return user
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED, response_model=UserOut)
 async def signup(payload: SignupPayload, session: DbSessionDep) -> User:
@@ -36,3 +46,48 @@ async def signup(payload: SignupPayload, session: DbSessionDep) -> User:
     except IntegrityError:
         raise DuplicatedEmailError()
     return user
+
+
+@router.post("/login", status_code=status.HTTP_200_OK)
+async def login(payload: LoginPayload, session: DbSessionDep) -> JSONResponse:
+    stmt = select(User).where(User.username == payload.username)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise UserNotFoundError()
+
+    is_valid = verify_password(payload.password, user.hashed_password)
+    if not is_valid:
+        raise PasswordMismatchError()
+
+    # return user
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={
+            "sub": user.username,
+            "display_name": user.display_name,
+            "is_host": user.is_host,
+        },
+        expires_delta=access_token_expires,
+    )
+
+    response_data = {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user.model_dump(mode="json", exclude={"hashed_password", "email"}),
+    }
+
+    # return JSONResponse(response_data)
+    now = datetime.now(timezone.utc)
+
+    res = JSONResponse(response_data, status_code=status.HTTP_200_OK)
+    res.set_cookie(
+        key="auth_token",
+        value=access_token,
+        expires=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+    return res
