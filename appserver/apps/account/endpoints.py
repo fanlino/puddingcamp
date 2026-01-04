@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import select, func
+from sqlmodel import select, func, update
 from sqlalchemy.exc import IntegrityError
 from .exceptions import DuplicatedUsernameError, DuplicatedEmailError, PasswordMismatchError, UserNotFoundError
 
 from appserver.db import DbSessionDep
 from .models import User
 from .deps import CurrentUserDep
-from .schemas import SignupPayload, UserOut, LoginPayload, UserDetailOut
+from .schemas import SignupPayload, UserOut, LoginPayload, UserDetailOut, UpdateUserPayload
 
 from fastapi.responses import JSONResponse
 from .utils import (
@@ -97,4 +97,18 @@ async def login(payload: LoginPayload, session: DbSessionDep) -> JSONResponse:
 
 @router.get("/@me", response_model=UserDetailOut)
 async def me(user: CurrentUserDep) -> User:
+    return user
+
+
+@router.patch("/@me", response_model=UserDetailOut)
+async def update_user(
+    user: CurrentUserDep,
+    payload: UpdateUserPayload,
+    session: DbSessionDep
+) -> User:
+    updated_data = payload.model_dump(exclude_none=True, exclude={"password", "password_again"})
+
+    stmt = update(User).filter_by(username=user.username).values(**updated_data)
+    await session.execute(stmt)
+    await session.commit()
     return user
