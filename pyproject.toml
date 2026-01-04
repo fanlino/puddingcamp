@@ -31,7 +31,7 @@ dev = [
 [tool.pytest.ini_options]
 minversion = "8.3.4"
 env = []
-addopts = " --strict-markers --tb=short --asyncio-mode=auto -p no:warnings --doctest-modules -s"
+addopts = " --strict-markers --tb=short --asyncio-mode=auto -p no:warnings --doctest-modules"
 python_files = ["tests.py", "test_*.py"]
 rootdir = "./"
 testpaths = ["./tests", "./appserver"]

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import select, func, update
+from sqlmodel import select, func, update, delete
 from sqlalchemy.exc import IntegrityError
 from .exceptions import DuplicatedUsernameError, DuplicatedEmailError, PasswordMismatchError, UserNotFoundError
 
@@ -95,6 +95,7 @@ async def login(payload: LoginPayload, session: DbSessionDep) -> JSONResponse:
     )
     return res
 
+
 @router.get("/@me", response_model=UserDetailOut)
 async def me(user: CurrentUserDep) -> User:
     return user
@@ -102,9 +103,9 @@ async def me(user: CurrentUserDep) -> User:
 
 @router.patch("/@me", response_model=UserDetailOut)
 async def update_user(
-    user: CurrentUserDep,
-    payload: UpdateUserPayload,
-    session: DbSessionDep
+        user: CurrentUserDep,
+        payload: UpdateUserPayload,
+        session: DbSessionDep
 ) -> User:
     updated_data = payload.model_dump(exclude_none=True, exclude={"password", "password_again"})
 
@@ -112,3 +113,18 @@ async def update_user(
     await session.execute(stmt)
     await session.commit()
     return user
+
+
+@router.delete("/logout", status_code=status.HTTP_200_OK)
+async def logout(user: CurrentUserDep) -> JSONResponse:
+    res = JSONResponse({})
+    res.delete_cookie(AUTH_TOKEN_COOKIE_NAME)
+    return res
+
+
+@router.delete("/unregister", status_code=status.HTTP_204_NO_CONTENT)
+async def unregister(user: CurrentUserDep, session: DbSessionDep) -> None:
+    stmt = delete(User).where(User.username == user.username)
+    await session.execute(stmt)
+    await session.commit()
+    return None
