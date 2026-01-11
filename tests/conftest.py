@@ -68,13 +68,13 @@ def client_with_auth(fastapi_app: FastAPI, host_user: account_models.User):
 
 
 @pytest.fixture()
-async def guest_user(db_session: AsyncSession):
+async def host_user(db_session: AsyncSession):
     user = account_models.User(
-        username="puddingcafe",
+        username="puddingcamp",
         hashed_password=hash_password("testtest"),
-        email="puddingcafe@example.com",
-        display_name="푸딩까페",
-        is_host=False,
+        email="puddingcamp@example.com",
+        display_name="푸딩캠프",
+        is_host=True,
     )
     db_session.add(user)
     await db_session.commit()
@@ -83,13 +83,13 @@ async def guest_user(db_session: AsyncSession):
 
 
 @pytest.fixture()
-async def host_user(db_session: AsyncSession):
+async def guest_user(db_session: AsyncSession):
     user = account_models.User(
-        username="test",
+        username="puddingcafe",
         hashed_password=hash_password("testtest"),
-        email="test@example.com",
-        display_name="test",
-        is_host=True,
+        email="puddingcafe@example.com",
+        display_name="푸딩까페",
+        is_host=False,
     )
     db_session.add(user)
     await db_session.commit()
