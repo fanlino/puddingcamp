@@ -1,3 +1,4 @@
+from datetime import date, time
 from typing import Annotated
 
 from sqlmodel import SQLModel, Field
@@ -43,3 +44,16 @@ class CalendarUpdateIn(SQLModel):
         description="Google Calendar ID",
     )
 
+
+class TimeSlotCreateIn(SQLModel):
+    start_time: time
+    end_time: time
+    weekdays: list[int]
+
+
+class TimeSlotOut(SQLModel):
+    start_time: time
+    end_time: time
+    weekdays: list[int]
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
