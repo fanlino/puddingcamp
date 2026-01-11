@@ -125,5 +125,5 @@ async def host_user_calendar(db_session: AsyncSession, host_user: account_models
     )
     db_session.add(calendar)
     await db_session.commit()
-    await db_session.flush()
+    await db_session.refresh(host_user)
     return calendar

@@ -1,6 +1,5 @@
-import string
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from sqlmodel import SQLModel, Field, Relationship, func, Column, AutoString
 from pydantic import EmailStr, AwareDatetime, model_validator
@@ -25,9 +24,9 @@ class User(SQLModel, table=True):
     is_host: bool = Field(default=False, description="사용자가 호스트인지 여부")
 
     oauth_accounts: list["OAuthAccount"] = Relationship(back_populates="user")
-    calendar: "Calendar" = Relationship(
+    calendar: Union["Calendar", None] = Relationship(
         back_populates="host",
-        sa_relationship_kwargs={"uselist": False, "single_parent": True},
+        sa_relationship_kwargs={"uselist": False, "single_parent": True, "lazy": "joined"},
     )
     bookings: list["Booking"] = Relationship(back_populates="guest")
 
