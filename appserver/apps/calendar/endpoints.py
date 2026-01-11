@@ -1,11 +1,12 @@
 from fastapi import APIRouter, status
 from sqlmodel import select
+from sqlalchemy.exc import IntegrityError
 
 from appserver.apps.account.models import User
 from appserver.apps.calendar.models import Calendar
 from appserver.apps.account.deps import CurrentUserOptionalDep, CurrentUserDep
 from appserver.db import DbSessionDep
-from .exceptions import HostNotFoundError, CalendarNotFoundError
+from .exceptions import HostNotFoundError, CalendarNotFoundError, CalendarAlreadyExistsError, GuestPermissionError
 
 from .schemas import CalendarDetailOut, CalendarOut, CalendarCreateIn
 
@@ -46,6 +47,8 @@ async def create_calendar(
     session: DbSessionDep,
     payload: CalendarCreateIn
 ) -> CalendarDetailOut:
+    if not user.is_host:
+        raise GuestPermissionError()
     calendar = Calendar(
         host_id=user.id,
         topics=payload.topics,
@@ -53,6 +56,9 @@ async def create_calendar(
         google_calendar_id=payload.google_calendar_id,
     )
     session.add(calendar)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        raise CalendarAlreadyExistsError() from exc
     return calendar
 
