@@ -1,5 +1,6 @@
 from datetime import date
 import pytest
+from pytest_lazy_fixtures import lf
 
 from fastapi import status
 from fastapi.testclient import TestClient
@@ -11,9 +12,9 @@ from tests.conftest import time_slot_tuesday
 
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_유효한_예약_신청_내용으로_예약_생성을_요청하면_예약_내용을_담아_HTTP_201_응답한다(
-    time_slot_tuesday: TimeSlot,
-    host_user: User,
-    client_with_guest_auth: TestClient,
+        time_slot_tuesday: TimeSlot,
+        host_user: User,
+        client_with_guest_auth: TestClient,
 ):
     target_date = date(2024, 12, 3)
     payload = {
@@ -39,9 +40,9 @@ async def test_유효한_예약_신청_내용으로_예약_생성을_요청하�
 
 
 async def test_호스트가_아닌_사용자에게_예약을_생성하면_HTTP_404_응답을_한다(
-    cute_guest_user: User,
-    client_with_guest_auth: TestClient,
-    time_slot_tuesday: TimeSlot,
+        cute_guest_user: User,
+        client_with_guest_auth: TestClient,
+        time_slot_tuesday: TimeSlot,
 ):
     target_date = date(2024, 12, 3)  # 화요일
     payload = {
@@ -68,11 +69,11 @@ async def test_호스트가_아닌_사용자에게_예약을_생성하면_HTTP_4
 )
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_존재하지_않는_시간대에_예약을_생성하면_HTTP_404_응답을_한다(
-    host_user: User,
-    client_with_guest_auth: TestClient,
-    time_slot_tuesday: TimeSlot,
-    time_slot_id_add: int,
-    target_date: date,
+        host_user: User,
+        client_with_guest_auth: TestClient,
+        time_slot_tuesday: TimeSlot,
+        time_slot_id_add: int,
+        target_date: date,
 ):
     payload = {
         "when": target_date.isoformat(),
@@ -88,8 +89,8 @@ async def test_존재하지_않는_시간대에_예약을_생성하면_HTTP_404_
 
 @pytest.mark.usefixtures("charming_host_bookings")
 async def test_호스트는_페이지_단위로_자신에게_예약된_부킹_목록을_받는다(
-    client_with_auth: TestClient,
-    host_bookings: list[Booking],
+        client_with_auth: TestClient,
+        host_bookings: list[Booking],
 ):
     response = client_with_auth.get("/bookings", params={"page": 1, "page_size": 10})
 
@@ -104,11 +105,11 @@ async def test_호스트는_페이지_단위로_자신에게_예약된_부킹_�
 )
 @pytest.mark.usefixtures("charming_host_bookings")
 async def test_게스트는_호스트의_캘린더의_예약_내역을_월_단위로_받는다(
-    client_with_guest_auth: TestClient,
-    host_bookings: list[Booking],
-    host_user: User,
-    year: int,
-    month: int,
+        client_with_guest_auth: TestClient,
+        host_bookings: list[Booking],
+        host_user: User,
+        year: int,
+        month: int,
 ):
     params = {
         "year": year,
@@ -131,4 +132,38 @@ async def test_게스트는_호스트의_캘린더의_예약_내역을_월_단�
     assert len(data) == len(booking_dates)
     assert all([item["when"] in booking_dates for item in data])
 
-    
+
+async def test_게스트는_자신의_캘린더의_예약_내역을_페이지_단위로_받는다(
+        client_with_guest_auth: TestClient,
+        host_bookings: list[Booking],
+        charming_host_bookings: list[Booking],
+):
+    response = client_with_guest_auth.get("/guest-calendar/bookings", params={"page": 1, "page_size": 50})
+
+    assert response.status_code == status.HTTP_200_OK
+
+    id_set = frozenset([booking.id for booking in host_bookings] + [booking.id for booking in charming_host_bookings])
+    data = response.json()
+    assert len(data) == len(id_set)
+    assert all([item["id"] in id_set for item in data])
+
+
+@pytest.mark.parametrize(
+    "client, expected_status_code",
+    [
+        (lf("client_with_guest_auth"), status.HTTP_200_OK),
+        (lf("client_with_smart_guest_auth"), status.HTTP_404_NOT_FOUND),
+    ],
+)
+async def test_사용자는_특정_예약_내역_데이터를_받는다(
+    host_bookings: list[Booking],
+    client: TestClient,
+    expected_status_code: int,
+):
+    response = client.get(f"/bookings/{host_bookings[0].id}")
+
+    assert response.status_code == expected_status_code
+
+    data = response.json()
+    if expected_status_code == status.HTTP_200_OK:
+        assert data["id"] == host_bookings[0].id
