@@ -75,3 +75,21 @@ class TimeSlotCreateIn(SQLModel):
         if self.start_time >= self.end_time:
             raise ValueError("시작 시간은 종료 시간보다 빨라야 합니다.")
         return self
+
+
+class BookingCreateIn(SQLModel):
+    when: date
+    topic: str
+    description: str
+    time_slot_id: int
+
+
+class BookingOut(SQLModel):
+    id: int
+    when: date
+    topic: str
+    description: str
+    time_slot: TimeSlotOut
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
