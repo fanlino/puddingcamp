@@ -98,3 +98,8 @@ class SimpleBookingOut(SQLModel):
     when: date
     time_slot: TimeSlotOut
 
+
+class HostBookingUpdateIn(SQLModel):
+    when: date | None = Field(default=None, description="예약 일자")
+    time_slot_id: int | None = Field(default=None, description="타임슬롯 ID")
+
