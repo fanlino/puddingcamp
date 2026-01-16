@@ -250,3 +250,24 @@ async def charming_host_bookings(
     await db_session.commit()
     return bookings
 
+
+@pytest.fixture()
+async def host_bookings(
+    db_session: AsyncSession,
+    guest_user: account_models.User,
+    time_slot_tuesday: calendar_models.TimeSlot,
+):
+    bookings = []
+    for when in [date(2024, 12, 3), date(2024, 12, 10), date(2024, 12, 17), date(2025, 1, 7)]:
+        booking = calendar_models.Booking(
+            when=when,
+            topic="test",
+            description="test",
+            time_slot_id=time_slot_tuesday.id,
+            guest_id=guest_user.id,
+        )
+        db_session.add(booking)
+        bookings.append(booking)
+    await db_session.commit()
+    return bookings
+
