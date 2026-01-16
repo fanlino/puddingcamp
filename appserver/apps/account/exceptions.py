@@ -49,3 +49,11 @@ class ExpiredTokenError(HTTPException):
             detail="만료된 인증 토큰입니다.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+class TimeSlotOverlapError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="겹치는 시간대가 이미 존재합니다.",
+        )

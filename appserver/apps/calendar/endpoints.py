@@ -120,7 +120,7 @@ async def create_time_slot(
 
     stmt = select(TimeSlot).where(
         and_(
-            TimeSlot.calendar_id == user.calendar_id,
+            TimeSlot.calendar_id == user.calendar.id,
             TimeSlot.start_time < payload.end_time,
             TimeSlot.end_time > payload.start_time,
         )
