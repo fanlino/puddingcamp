@@ -13,6 +13,7 @@ from appserver.db import create_engine, create_session, use_session
 from appserver.app import include_routers
 from appserver.apps.account import models as account_models
 from appserver.apps.calendar import models as calendar_models
+from appserver.libs.datetime.datetime import utcnow
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +43,11 @@ def fastapi_app(db_session: AsyncSession):
     async def override_use_session():
         yield db_session
 
+    def override_utcnow():
+        return utcnow().replace(year=2024, month=12, day=5)
+
     app.dependency_overrides[use_session] = override_use_session
+    app.dependency_overrides[utcnow] = override_utcnow
     return app
 
 
@@ -152,8 +157,8 @@ async def host_user_calendar(db_session: AsyncSession, host_user: account_models
 
 @pytest.fixture()
 async def time_slot_monday(
-    db_session: AsyncSession,
-    host_user_calendar: calendar_models.Calendar,
+        db_session: AsyncSession,
+        host_user_calendar: calendar_models.Calendar,
 ):
     time_slot = calendar_models.TimeSlot(
         start_time=time(9, 0),
@@ -210,6 +215,7 @@ async def charming_host_user(db_session: AsyncSession):
     await db_session.commit()
     await db_session.flush()
     return user
+
 
 @pytest.fixture()
 async def smart_guest_user(db_session: AsyncSession):
@@ -340,8 +346,8 @@ async def host_bookings(
 
 @pytest.fixture()
 async def time_slot_friday(
-    db_session: AsyncSession,
-    charming_host_user_calendar: calendar_models.Calendar,
+        db_session: AsyncSession,
+        charming_host_user_calendar: calendar_models.Calendar,
 ):
     time_slot = calendar_models.TimeSlot(
         start_time=time(10, 0),
@@ -352,4 +358,3 @@ async def time_slot_friday(
     db_session.add(time_slot)
     await db_session.commit()
     return time_slot
-

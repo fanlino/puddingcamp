@@ -3,6 +3,8 @@ from typing import Annotated
 
 from sqlmodel import SQLModel, Field
 from pydantic import AwareDatetime, EmailStr, AfterValidator
+
+from appserver.apps.calendar.enums import AttendanceStatus
 from appserver.libs.collections.sort import deduplicate_and_sort
 from pydantic import model_validator
 
@@ -90,8 +92,13 @@ class BookingOut(SQLModel):
     topic: str
     description: str
     time_slot: TimeSlotOut
+    attendance_status: AttendanceStatus
     created_at: AwareDatetime
     updated_at: AwareDatetime
+
+
+class HostBookingStatusUpdateIn(SQLModel):
+    attendance_status: AttendanceStatus
 
 
 class SimpleBookingOut(SQLModel):
