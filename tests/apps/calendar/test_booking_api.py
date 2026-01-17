@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from appserver.apps.account.models import User
 from appserver.apps.calendar.models import TimeSlot, Booking
+from appserver.apps.calendar.schemas import BookingOut
 from tests.conftest import time_slot_tuesday
 
 
@@ -196,4 +197,103 @@ async def test_호스트는_자신에게_신청한_부킹에_대해_일자_타�
     assert data["time_slot"]["start_time"] == time_slot.start_time.isoformat()
     assert data["time_slot"]["end_time"] == time_slot.end_time.isoformat()
     assert data["time_slot"]["weekdays"] == time_slot.weekdays
+
+
+@pytest.mark.parametrize(
+    "time_slot, expected_status_code",
+    [
+        (lf("time_slot_friday"), status.HTTP_404_NOT_FOUND),
+        (lf("time_slot_tuesday"), status.HTTP_200_OK),
+    ],
+)
+async def test_호스트는_다른_호스트의_타임슬롯으로_변경할_수_없다(
+    client_with_auth: TestClient,
+    host_bookings: list[Booking],
+    time_slot: TimeSlot,
+    expected_status_code: int,
+):
+    response = client_with_auth.patch(
+        f"/bookings/{host_bookings[0].id}",
+        json={"time_slot_id": time_slot.id},
+    )
+    assert response.status_code == expected_status_code
+
+
+@pytest.mark.parametrize(
+    "time_slot, expected_status_code",
+    [
+        (lf("time_slot_friday"), status.HTTP_404_NOT_FOUND),
+        (lf("time_slot_tuesday"), status.HTTP_200_OK),
+    ],
+)
+async def test_게스트는_다른_호스트의_타임슬롯으로_변경할_수_없다(
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    time_slot: TimeSlot,
+    expected_status_code: int,
+):
+    response = client_with_guest_auth.patch(
+        f"/guest-bookings/{host_bookings[0].id}",
+        json={"time_slot_id": time_slot.id},
+    )
+    assert response.status_code == expected_status_code
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"topic": "test", "description": "test", "when": "2025-01-01", "time_slot": lf("time_slot_tuesday")},
+        {"topic": "test", "description": "test", "when": "2025-01-02", "time_slot": lf("time_slot_monday")},
+        {"description": "test", "when": "2025-01-12"},
+    ],
+)
+async def test_게스트는_자신의_부킹에_대해_주제_설명_일자_타임슬롯을_변경할_수_있다(
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    payload: dict,
+):
+    booking = host_bookings[0]
+
+    # 변경 전 데이터 추출
+    before_booking = BookingOut.model_validate(booking, from_attributes=True).model_dump(mode="json")
+
+    # 변경 가능한 필드 설정
+    updatable_fields = set(["topic", "description", "when", "time_slot"])
+    exceptable_fields = updatable_fields - set(payload.keys())
+
+    # 타임슬롯 처리
+    if time_slot := payload.pop("time_slot", None):
+        time_slot: TimeSlot
+        payload["time_slot_id"] = time_slot.id
+    else:
+        time_slot = None
+        payload["time_slot_id"] = None
+
+    # 요청 보내기
+    response = client_with_guest_auth.patch(
+        f"/guest-bookings/{booking.id}",
+        json=payload,
+    )
+
+    # 응답 검증
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+
+    # 변경된 필드 검증
+    for field, value in payload.items():
+        if field == "time_slot_id" and time_slot:
+            assert data["time_slot"]["start_time"] == time_slot.start_time.isoformat()
+            assert data["time_slot"]["end_time"] == time_slot.end_time.isoformat()
+            assert data["time_slot"]["weekdays"] == time_slot.weekdays
+        else:
+            assert payload[field] == value
+
+    # 변경되지 않은 필드 검증
+    for field_name in exceptable_fields:
+        if field_name == "time_slot":
+            assert before_booking["time_slot"]["start_time"] == data["time_slot"]["start_time"]
+            assert before_booking["time_slot"]["end_time"] == data["time_slot"]["end_time"]
+            assert before_booking["time_slot"]["weekdays"] == data["time_slot"]["weekdays"]
+        else:
+            assert before_booking[field_name] == data[field_name]
 

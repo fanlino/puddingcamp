@@ -18,11 +18,10 @@ from .schemas import (
     TimeSlotOut,
     BookingCreateIn,
     BookingOut,
-    SimpleBookingOut, HostBookingUpdateIn,
+    SimpleBookingOut, HostBookingUpdateIn, GuestBookingUpdateIn,
 )
 from datetime import datetime, timezone
 from typing import Annotated
-
 
 router = APIRouter()
 
@@ -155,10 +154,10 @@ async def create_time_slot(
     response_model=BookingOut,
 )
 async def create_booking(
-    host_username: str,
-    user: CurrentUserDep,
-    session: DbSessionDep,
-    payload: BookingCreateIn
+        host_username: str,
+        user: CurrentUserDep,
+        session: DbSessionDep,
+        payload: BookingCreateIn
 ) -> BookingOut:
     stmt = (
         select(User)
@@ -226,10 +225,10 @@ async def get_host_bookings_by_month(
     response_model=list[SimpleBookingOut],
 )
 async def host_calendar_bookings(
-    host_username: str,
-    session: DbSessionDep,
-    year: Annotated[int, Query(ge=2024, le=2025)],
-    month: Annotated[int, Query(ge=1, le=12)],
+        host_username: str,
+        session: DbSessionDep,
+        year: Annotated[int, Query(ge=2024, le=2025)],
+        month: Annotated[int, Query(ge=1, le=12)],
 ) -> list[SimpleBookingOut]:
     stmt = select(User).where(User.username == host_username)
     result = await session.execute(stmt)
@@ -255,10 +254,10 @@ async def host_calendar_bookings(
     response_model=list[BookingOut],
 )
 async def guest_calendar_bookings(
-    user: CurrentUserDep,
-    session: DbSessionDep,
-    page: Annotated[int, Query(ge=1)],
-    page_size: Annotated[int, Query(ge=1, le=50)],
+        user: CurrentUserDep,
+        session: DbSessionDep,
+        page: Annotated[int, Query(ge=1)],
+        page_size: Annotated[int, Query(ge=1, le=50)],
 ) -> list[BookingOut]:
     stmt = (
         select(Booking)
@@ -271,16 +270,15 @@ async def guest_calendar_bookings(
     return result.scalars().all()
 
 
-
 @router.get(
     "/bookings/{booking_id}",
     status_code=status.HTTP_200_OK,
     response_model=BookingOut,
 )
 async def get_booking_by_id(
-    user: CurrentUserDep,
-    session: DbSessionDep,
-    booking_id: int
+        user: CurrentUserDep,
+        session: DbSessionDep,
+        booking_id: int
 ) -> BookingOut:
     stmt = select(Booking).where(Booking.id == booking_id)
     if user.is_host and user.calendar is not None:
@@ -340,6 +338,50 @@ async def host_update_booking(
 
         booking.time_slot_id = time_slot.id
 
+    await session.commit()
+    await session.refresh(booking)
+    return booking
+
+
+@router.patch(
+    "/guest-bookings/{booking_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=BookingOut,
+)
+async def guest_update_booking(
+        user: CurrentUserDep,
+        session: DbSessionDep,
+        booking_id: int,
+        payload: GuestBookingUpdateIn
+) -> BookingOut:
+    stmt = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .where(Booking.guest_id == user.id)
+    )
+    result = await session.execute(stmt)
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
+
+    if payload.time_slot_id is not None:
+        stmt = (
+            select(TimeSlot)
+            .where(TimeSlot.id == payload.time_slot_id)
+            .where(TimeSlot.calendar_id == booking.time_slot.calendar_id)
+        )
+        result = await session.execute(stmt)
+        time_slot = result.scalar_one_or_none()
+        if time_slot is None:
+            raise TimeSlotNotFoundError()
+        booking.time_slot_id = time_slot.id
+
+    if payload.topic is not None:
+        booking.topic = payload.topic
+    if payload.description is not None:
+        booking.description = payload.description
+    if payload.when is not None:
+        booking.when = payload.when
     await session.commit()
     await session.refresh(booking)
     return booking

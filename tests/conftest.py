@@ -235,7 +235,7 @@ async def charming_host_user_calendar(db_session: AsyncSession, charming_host_us
         google_calendar_id="0987654321",
     )
     db_session.add(calendar)
-    await db_session.commit() @ pytest.fixture()
+    await db_session.commit()
     await db_session.refresh(charming_host_user)
     return calendar
 
@@ -338,4 +338,18 @@ async def host_bookings(
     return bookings
 
 
+@pytest.fixture()
+async def time_slot_friday(
+    db_session: AsyncSession,
+    charming_host_user_calendar: calendar_models.Calendar,
+):
+    time_slot = calendar_models.TimeSlot(
+        start_time=time(10, 0),
+        end_time=time(11, 0),
+        weekdays=[calendar.FRIDAY],
+        calendar_id=charming_host_user_calendar.id,
+    )
+    db_session.add(time_slot)
+    await db_session.commit()
+    return time_slot
 
