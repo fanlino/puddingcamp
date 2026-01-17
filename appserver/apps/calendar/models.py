@@ -2,10 +2,15 @@ from datetime import date, time, timezone, datetime
 from typing import TYPE_CHECKING
 from pydantic import AwareDatetime
 from sqlalchemy_utc import UtcDateTime
-from sqlmodel import SQLModel, Field, Relationship, Text, JSON, func, String
+from sqlmodel import SQLModel, Field, Relationship, Text, JSON, func, String, Column
+from sqlmodel.main import SQLModelConfig
 from sqlalchemy.dialects.postgresql import JSONB
 
 from appserver.apps.calendar.enums import AttendanceStatus
+
+from fastapi_storages import FileSystemStorage
+from fastapi_storages import StorageFile
+from fastapi_storages.integrations.sqlalchemy import FileType
 
 if TYPE_CHECKING:
     from appserver.apps.account.models import User
@@ -80,6 +85,7 @@ class TimeSlot(SQLModel, table=True):
         }
     )
 
+
 class Booking(SQLModel, table=True):
     __tablename__ = "bookings"
 
@@ -87,7 +93,7 @@ class Booking(SQLModel, table=True):
     when: date
     topic: str
     description: str = Field(sa_type=Text, description="예약 설명")
-
+    # 참석 상태 종류
     attendance_status: AttendanceStatus = Field(
         default=AttendanceStatus.SCHEDULED,
         description="참석 상태",
@@ -95,10 +101,15 @@ class Booking(SQLModel, table=True):
     )
 
     time_slot_id: int = Field(foreign_key="time_slots.id")
-    time_slot: TimeSlot = Relationship(back_populates="bookings")
+    time_slot: TimeSlot = Relationship(
+        back_populates="bookings",
+        sa_relationship_kwargs={"lazy": "joined"},
+    )
 
     guest_id: int = Field(foreign_key="users.id")
     guest: "User" = Relationship(back_populates="bookings")
+
+    files: list["BookingFile"] = Relationship(back_populates="booking")
 
     created_at: AwareDatetime = Field(
         default=None,
@@ -106,14 +117,33 @@ class Booking(SQLModel, table=True):
         sa_type=UtcDateTime,
         sa_column_kwargs={
             "server_default": func.now(),
-        }
+        },
     )
-    updated_at: datetime = Field(
+    updated_at: AwareDatetime = Field(
         default=None,
         nullable=False,
         sa_type=UtcDateTime,
         sa_column_kwargs={
             "server_default": func.now(),
             "onupdate": lambda: datetime.now(timezone.utc),
-        }
+        },
+    )
+
+
+class BookingFile(SQLModel, table=True):
+    __tablename__ = "booking_files"
+
+    id: int = Field(default=None, primary_key=True)
+    booking_id: int = Field(foreign_key="bookings.id")
+    booking: Booking = Relationship(back_populates="files")
+    file: StorageFile = Field(
+        exclude=True,
+        sa_column=Column(
+            FileType(storage=FileSystemStorage(path="uploads/bookings")),
+            nullable=False,
+        ),
+    )
+
+    model_config = SQLModelConfig(
+        arbitrary_types_allowed=True,
     )

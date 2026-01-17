@@ -1,4 +1,5 @@
-from fastapi import APIRouter, status, Query, HTTPException
+from fastapi import APIRouter, status, Query, HTTPException, UploadFile, File
+from sqlalchemy.sql.functions import user
 from sqlmodel import select, and_, func, true, extract
 from sqlalchemy.exc import IntegrityError
 
@@ -10,7 +11,7 @@ from appserver.db import DbSessionDep
 from .exceptions import (HostNotFoundError, CalendarNotFoundError, CalendarAlreadyExistsError, GuestPermissionError,
                          TimeSlotOverlapError, TimeSlotNotFoundError, PastBookingError)
 from .deps import UtcNow
-from .models import Calendar, TimeSlot, Booking
+from .models import Calendar, TimeSlot, Booking, BookingFile
 from .schemas import (
     CalendarDetailOut,
     CalendarOut,
@@ -223,7 +224,6 @@ async def get_host_bookings_by_month(
     result = await session.execute(stmt)
     return result.scalars().all()
 
-
 @router.get(
     "/calendar/{host_username}/bookings",
     status_code=status.HTTP_200_OK,
@@ -424,4 +424,36 @@ async def update_booking_status(
     booking.attendance_status = payload.attendance_status
     await session.commit()
     await session.refresh(booking)
+    return booking
+
+
+@router.post(
+    "/bookings/{booking_id}/upload",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BookingOut,
+)
+async def upload_booking_files(
+        user: CurrentUserDep,
+        booking_id: int,
+        files: Annotated[list[UploadFile], File(min_length=1, max_length=3)],
+        session: DbSessionDep,
+        now: UtcNow,
+) -> BookingOut:
+    stmt = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .where(Booking.guest_id == user.id)
+    )
+    result = await session.execute(stmt)
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
+
+    if booking.when <= now.date():
+        raise PastBookingError()
+
+    for file in files:
+        session.add(BookingFile(booking_id=booking.id, file=file))
+    await session.commit()
+    await session.refresh(booking, ["files"])
     return booking
