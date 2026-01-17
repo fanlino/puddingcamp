@@ -109,7 +109,10 @@ class Booking(SQLModel, table=True):
     guest_id: int = Field(foreign_key="users.id")
     guest: "User" = Relationship(back_populates="bookings")
 
-    files: list["BookingFile"] = Relationship(back_populates="booking")
+    files: list["BookingFile"] = Relationship(
+        back_populates="booking",
+        sa_relationship_kwargs={"lazy": "joined"},
+    )
 
     created_at: AwareDatetime = Field(
         default=None,

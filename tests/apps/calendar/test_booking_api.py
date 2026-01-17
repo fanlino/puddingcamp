@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 from appserver.apps.account.models import User
 from appserver.apps.calendar.enums import AttendanceStatus
 from appserver.apps.calendar.models import TimeSlot, Booking
-from appserver.apps.calendar.schemas import BookingOut
 from tests.conftest import time_slot_tuesday
 
 
@@ -257,7 +256,16 @@ async def test_게스트는_자신의_부킹에_대해_주제_설명_일자_타�
     booking = host_bookings[0]
 
     # 변경 전 데이터 추출
-    before_booking = BookingOut.model_validate(booking, from_attributes=True).model_dump(mode="json")
+    before_booking = {
+        "topic": booking.topic,
+        "description": booking.description,
+        "when": booking.when.isoformat(),
+        "time_slot": {
+            "start_time": booking.time_slot.start_time.isoformat(),
+            "end_time": booking.time_slot.end_time.isoformat(),
+            "weekdays": booking.time_slot.weekdays,
+        },
+    }
 
     # 변경 가능한 필드 설정
     updatable_fields = set(["topic", "description", "when", "time_slot"])
