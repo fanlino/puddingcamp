@@ -104,6 +104,7 @@ class TimeSlot(SQLModel, table=True):
         return f"{self.calendar}. {self.start_time} - {self.end_time} {self.weekdays}"
 
 
+
 class Booking(SQLModel, table=True):
     __tablename__ = "bookings"
 
@@ -133,6 +134,14 @@ class Booking(SQLModel, table=True):
     files: list["BookingFile"] = Relationship(
         back_populates="booking",
         sa_relationship_kwargs={"lazy": "joined"},
+    )
+
+    google_event_id: str | None = Field(
+        max_length=64,
+        default=None,
+        nullable=True,
+        description="Google Calendar Event ID",
+        sa_type=String,
     )
 
     created_at: AwareDatetime = Field(
@@ -169,7 +178,7 @@ class BookingFile(SQLModel, table=True):
     booking_id: int = Field(foreign_key="bookings.id")
     booking: Booking = Relationship(
         back_populates="files",
-        sa_relationship_kwargs={"lazy": "joined"},
+        sa_relationship_kwargs={"lazy": "noload"},
     )
     file: StorageFile = Field(
         exclude=True,

@@ -1,4 +1,5 @@
 import calendar
+import os
 from datetime import date, time
 
 from fastapi import FastAPI, status
@@ -147,7 +148,7 @@ async def host_user_calendar(db_session: AsyncSession, host_user: account_models
         host_id=host_user.id,
         description="푸딩캠프 캘린더 입니다.",
         topics=["푸딩캠프", "푸딩캠프2"],
-        google_calendar_id="1234567890",
+        google_calendar_id=os.getenv("GOOGLE_CALENDAR_ID"),
     )
     db_session.add(calendar)
     await db_session.commit()
