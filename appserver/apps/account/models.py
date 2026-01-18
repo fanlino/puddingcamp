@@ -48,6 +48,9 @@ class User(SQLModel, table=True):
         },
     )
 
+    def __str__(self) -> str:
+        return f"{self.username} ({self.email})"
+
     # @model_validator(mode="before")
     # @classmethod
     # def generate_display_name(cls, data: dict) -> dict:
@@ -69,7 +72,7 @@ class OAuthAccount(SQLModel, table=True):
 
     id: int = Field(default=None, primary_key=True)
 
-    provider_id: str = Field(max_length=10, description="OAuth 제공자")
+    provider: str = Field(max_length=10, description="OAuth 제공자")
     provider_account_id: str = Field(max_length=128, description="OAuth 제공자 계정 ID")
 
     user_id: int = Field(foreign_key="users.id")
