@@ -49,6 +49,15 @@ class TimeSlotNotFoundError(HTTPException):
         )
 
 
+class SelfBookingError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="자기 자신에게는 부킹을 할 수 없습니다.",
+        )
+
+
+
 class PastBookingError(HTTPException):
     def __init__(self):
         super().__init__(
@@ -56,3 +65,18 @@ class PastBookingError(HTTPException):
             detail="과거 일자에는 부킹을 할 수 없습니다.",
         )
 
+
+class BookingAlreadyExistsError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="이미 예약된 시간대입니다.",
+        )
+
+
+class InvalidYearMonthError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="유효하지 않은 년도 또는 월입니다.",
+        )

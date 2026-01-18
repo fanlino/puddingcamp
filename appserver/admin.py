@@ -1,6 +1,7 @@
 import ujson
 from fastapi import status
 from sqladmin import Admin
+from jose.exceptions import JWTError
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 
@@ -50,4 +51,7 @@ class AdminAuthentication(AuthenticationBackend):
         if not token:
             return False
 
-        return not not decode_token(token)
+        try:
+            return not not decode_token(token)
+        except JWTError:
+            return False

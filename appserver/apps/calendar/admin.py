@@ -79,7 +79,7 @@ class CalendarAdmin(ModelView, model=Calendar):
             join_expressions.append(cast(field, String).ilike(f"%{term}%"))
 
         # JSON 쿼리를 처리하는 부분
-        dialect_name = engine.dialect.name  # 엔진 이름을 가져옴
+        dialect_name = engine.dialect.name # 엔진 이름을 가져옴
         json_expressions = []
         json_expressions.append(
             exact_match_list_json(dialect_name, Calendar.topics, term, Unicode)
@@ -96,7 +96,6 @@ class CalendarAdmin(ModelView, model=Calendar):
 
 
 WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
-
 
 class TimeSlotAdmin(ModelView, model=TimeSlot):
     category = "캘린더"

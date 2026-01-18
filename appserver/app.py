@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -14,8 +16,22 @@ def include_routers(_app: FastAPI):
     _app.include_router(account_router)
     _app.include_router(calendar_router)
 
+    _app.mount("/static", StaticFiles(directory="static"), name="static")
+    _app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+def init_middleware(_app: FastAPI):
+    _app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 
 include_routers(app)
+init_middleware(app)
 
 
 def init_admin(_app: FastAPI, _engine: AsyncEngine):
@@ -23,7 +39,7 @@ def init_admin(_app: FastAPI, _engine: AsyncEngine):
         _app,
         _engine,
         base_url="/@/-_-/@/nimda/",
-        authentication_backend=AdminAuthentication("dkjkmasdfa"),
+        authentication_backend=AdminAuthentication("secret-key"),
     )
 
 

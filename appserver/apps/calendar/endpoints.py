@@ -1,35 +1,52 @@
-from fastapi import APIRouter, status, Query, HTTPException, UploadFile, File
-from sqlalchemy.sql.functions import user
+from typing import Annotated
+from datetime import datetime, timezone
+from fastapi import APIRouter, File, UploadFile, status, Query, HTTPException
 from sqlmodel import select, and_, func, true, extract
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import selectinload
+from starlette.responses import StreamingResponse
 
 from appserver.apps.account.models import User
-
-from appserver.apps.account.deps import CurrentUserOptionalDep, CurrentUserDep
+from appserver.apps.account.deps import CurrentUserDep, CurrentUserOptionalDep
 from appserver.db import DbSessionDep
 
-from .exceptions import (HostNotFoundError, CalendarNotFoundError, CalendarAlreadyExistsError, GuestPermissionError,
-                         TimeSlotOverlapError, TimeSlotNotFoundError, PastBookingError)
+from .enums import AttendanceStatus
+from .exceptions import (
+    BookingAlreadyExistsError,
+    CalendarAlreadyExistsError,
+    CalendarNotFoundError,
+    GuestPermissionError,
+    HostNotFoundError,
+    PastBookingError,
+    SelfBookingError,
+    TimeSlotNotFoundError,
+    TimeSlotOverlapError,
+)
+
 from .deps import UtcNow
-from .models import Calendar, TimeSlot, Booking, BookingFile
+from .models import Booking, BookingFile, Calendar, TimeSlot
 from .schemas import (
-    CalendarDetailOut,
-    CalendarOut,
-    CalendarCreateIn,
-    CalendarUpdateIn,
-    TimeSlotCreateIn,
-    TimeSlotOut,
     BookingCreateIn,
     BookingOut,
-    SimpleBookingOut,
-    HostBookingUpdateIn,
+    CalendarCreateIn,
+    CalendarDetailOut,
+    CalendarOut,
+    CalendarUpdateIn,
     GuestBookingUpdateIn,
     HostBookingStatusUpdateIn,
+    HostBookingUpdateIn,
+    PaginatedBookingOut,
+    SimpleBookingOut,
+    TimeSlotCreateIn,
+    TimeSlotOut,
 )
-from datetime import datetime, timezone
-from typing import Annotated
 
 router = APIRouter()
+
+
+def check_overlap_sqlite(existing_weekdays: list[int], new_weekdays: list[int]) -> bool:
+    return any(day in existing_weekdays for day in new_weekdays)
 
 
 @router.get("/calendar/{host_username}", status_code=status.HTTP_200_OK)
@@ -56,6 +73,64 @@ async def host_calendar_detail(
     return CalendarOut.model_validate(calendar)
 
 
+@router.get(
+    "/calendar/{host_username}/bookings",
+    status_code=status.HTTP_200_OK,
+    response_model=list[SimpleBookingOut],
+)
+async def host_calendar_bookings(
+        host_username: str,
+        session: DbSessionDep,
+        year: Annotated[int, Query(ge=2024, le=2025)],
+        month: Annotated[int, Query(ge=1, le=12)],
+) -> list[SimpleBookingOut]:
+    stmt = select(User).where(User.username == host_username)
+    result = await session.execute(stmt)
+    host = result.scalar_one_or_none()
+
+    if host is None or host.calendar is None:
+        raise HostNotFoundError()
+
+    stmt = (
+        select(Booking)
+        .where(Booking.time_slot.has(TimeSlot.calendar_id == host.calendar.id))
+        .where(extract('year', Booking.when) == year)
+        .where(extract('month', Booking.when) == month)
+        .order_by(Booking.when.desc())
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+@router.get(
+    "/guest-calendar/bookings",
+    status_code=status.HTTP_200_OK,
+    response_model=PaginatedBookingOut,
+)
+async def guest_calendar_bookings(
+        user: CurrentUserDep,
+        session: DbSessionDep,
+        page: Annotated[int, Query(ge=1)],
+        page_size: Annotated[int, Query(ge=1, le=50)],
+) -> PaginatedBookingOut:
+    stmt = (
+        select(Booking)
+        .options(selectinload(Booking.files))
+        .where(Booking.guest_id == user.id)
+        .order_by(Booking.when.desc(), Booking.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    result = await session.execute(stmt)
+    count_stmt = select(func.count()).select_from(Booking).where(Booking.guest_id == user.id)
+    count_result = await session.execute(count_stmt)
+
+    return PaginatedBookingOut(
+        bookings=result.scalars().all(),
+        total_count=count_result.scalar_one_or_none() or 0,
+    )
+
+
 @router.post(
     "/calendar",
     status_code=status.HTTP_201_CREATED,
@@ -68,6 +143,7 @@ async def create_calendar(
 ) -> CalendarDetailOut:
     if not user.is_host:
         raise GuestPermissionError()
+
     calendar = Calendar(
         host_id=user.id,
         topics=payload.topics,
@@ -129,18 +205,39 @@ async def create_time_slot(
     if not user.is_host:
         raise GuestPermissionError()
 
-    stmt = select(TimeSlot).where(
-        and_(
-            TimeSlot.calendar_id == user.calendar.id,
-            TimeSlot.start_time < payload.end_time,
-            TimeSlot.end_time > payload.start_time,
-        )
-    )
-    result = await session.execute(stmt)
-    existing_time_slots = result.scalars().all()
+    # 데이터베이스 엔진 확인
+    engine: Engine = session.bind
+    is_sqlite = engine.dialect.name == "sqlite"
 
-    for existing_time_slot in existing_time_slots:
-        if any(day in existing_time_slot.weekdays for day in payload.weekdays):
+    if is_sqlite:
+        # 이미 존재하는 타임슬롯과 겹치는지 확인
+        stmt = select(TimeSlot).where(
+            and_(
+                TimeSlot.calendar_id == user.calendar.id,
+                TimeSlot.start_time < payload.end_time,
+                TimeSlot.end_time > payload.start_time
+            )
+        )
+        result = await session.execute(stmt)
+        existing_time_slots = result.scalars().all()
+
+        for existing_time_slot in existing_time_slots:
+            if any(day in existing_time_slot.weekdays for day in payload.weekdays):
+                raise TimeSlotOverlapError()
+    else:
+        # PostgreSQL: SQL에서 교집합 확인
+        stmt = select(TimeSlot).where(
+            and_(
+                TimeSlot.calendar_id == user.calendar.id,
+                func.jsonb_array_elements_text(TimeSlot.weekdays).in_(payload.weekdays),
+                TimeSlot.start_time < payload.end_time,
+                TimeSlot.end_time > payload.start_time
+            )
+        )
+        result = await session.execute(stmt)
+        existing_time_slot = result.scalar_one_or_none()
+
+        if existing_time_slot:
             raise TimeSlotOverlapError()
 
     time_slot = TimeSlot(
@@ -175,6 +272,12 @@ async def create_booking(
     if host is None or host.calendar is None:
         raise HostNotFoundError()
 
+    if user.id == host.id:
+        raise SelfBookingError()
+
+    if payload.when < datetime.now(timezone.utc).date():
+        raise PastBookingError()
+
     stmt = (
         select(TimeSlot)
         .where(TimeSlot.id == payload.time_slot_id)
@@ -187,6 +290,18 @@ async def create_booking(
     if payload.when.weekday() not in time_slot.weekdays:
         raise TimeSlotNotFoundError()
 
+    stmt = (
+        select(func.count())
+        .select_from(Booking)
+        .where(Booking.guest_id == user.id)
+        .where(Booking.when == payload.when)
+        .where(Booking.time_slot_id == payload.time_slot_id)
+    )
+    result = await session.execute(stmt)
+    exists = result.scalar_one_or_none()
+    if exists:
+        raise BookingAlreadyExistsError()
+
     booking = Booking(
         guest_id=user.id,
         when=payload.when,
@@ -196,7 +311,7 @@ async def create_booking(
     )
     session.add(booking)
     await session.commit()
-    await session.refresh(booking)
+    await session.refresh(booking, ["files", "time_slot"])
     return booking
 
 
@@ -222,57 +337,8 @@ async def get_host_bookings_by_month(
         .limit(page_size)
     )
     result = await session.execute(stmt)
-    return result.unique().scalars().all()
 
-@router.get(
-    "/calendar/{host_username}/bookings",
-    status_code=status.HTTP_200_OK,
-    response_model=list[SimpleBookingOut],
-)
-async def host_calendar_bookings(
-        host_username: str,
-        session: DbSessionDep,
-        year: Annotated[int, Query(ge=2024, le=2025)],
-        month: Annotated[int, Query(ge=1, le=12)],
-) -> list[SimpleBookingOut]:
-    stmt = select(User).where(User.username == host_username)
-    result = await session.execute(stmt)
-    host = result.scalar_one_or_none()
-
-    if host is None or host.calendar is None:
-        raise HostNotFoundError()
-
-    stmt = (
-        select(Booking)
-        .where(Booking.time_slot.has(TimeSlot.calendar_id == host.calendar.id))
-        .where(extract('year', Booking.when) == year)
-        .where(extract('month', Booking.when) == month)
-        .order_by(Booking.when.desc())
-    )
-    result = await session.execute(stmt)
-    return result.unique().scalars().all()
-
-
-@router.get(
-    "/guest-calendar/bookings",
-    status_code=status.HTTP_200_OK,
-    response_model=list[BookingOut],
-)
-async def guest_calendar_bookings(
-        user: CurrentUserDep,
-        session: DbSessionDep,
-        page: Annotated[int, Query(ge=1)],
-        page_size: Annotated[int, Query(ge=1, le=50)],
-) -> list[BookingOut]:
-    stmt = (
-        select(Booking)
-        .where(Booking.guest_id == user.id)
-        .order_by(Booking.when.desc(), Booking.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
-    result = await session.execute(stmt)
-    return result.unique().scalars().all()
+    return result.scalars().all()
 
 
 @router.get(
@@ -290,13 +356,14 @@ async def get_booking_by_id(
         stmt = (
             stmt
             .join(Booking.time_slot)
+            .options(selectinload(Booking.files))
             .where((TimeSlot.calendar_id == user.calendar.id) | (Booking.guest_id == user.id))
         )
     else:
-        stmt = stmt.where(Booking.guest_id == user.id)
+        stmt = stmt.where(Booking.guest_id == user.id).options(selectinload(Booking.files))
 
     result = await session.execute(stmt)
-    booking = result.unique().scalar_one_or_none()
+    booking = result.scalar_one_or_none()
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
     return booking
@@ -311,6 +378,7 @@ async def host_update_booking(
         user: CurrentUserDep,
         session: DbSessionDep,
         booking_id: int,
+        now: UtcNow,
         payload: HostBookingUpdateIn
 ) -> BookingOut:
     if not user.is_host or user.calendar is None:
@@ -323,12 +391,12 @@ async def host_update_booking(
         .where(TimeSlot.calendar_id == user.calendar.id)
     )
     result = await session.execute(stmt)
-    booking = result.unique().scalar_one_or_none()
+    booking = result.scalar_one_or_none()
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
 
-    if payload.when is not None:
-        booking.when = payload.when
+    if booking.when < now.date():
+        raise PastBookingError()
 
     if payload.time_slot_id is not None:
         stmt = (
@@ -337,11 +405,16 @@ async def host_update_booking(
             .where(TimeSlot.calendar_id == user.calendar.id)
         )
         result = await session.execute(stmt)
-        time_slot = result.unique().scalar_one_or_none()
+        time_slot = result.scalar_one_or_none()
         if time_slot is None:
             raise TimeSlotNotFoundError()
 
         booking.time_slot_id = time_slot.id
+
+    if payload.when is not None:
+        if payload.when.weekday() not in booking.time_slot.weekdays:
+            raise TimeSlotNotFoundError()
+        booking.when = payload.when
 
     await session.commit()
     await session.refresh(booking)
@@ -357,6 +430,7 @@ async def guest_update_booking(
         user: CurrentUserDep,
         session: DbSessionDep,
         booking_id: int,
+        now: UtcNow,
         payload: GuestBookingUpdateIn
 ) -> BookingOut:
     stmt = (
@@ -365,9 +439,12 @@ async def guest_update_booking(
         .where(Booking.guest_id == user.id)
     )
     result = await session.execute(stmt)
-    booking = result.unique().scalar_one_or_none()
+    booking = result.scalar_one_or_none()
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
+
+    if booking.when <= now.date():
+        raise PastBookingError()
 
     if payload.time_slot_id is not None:
         stmt = (
@@ -376,7 +453,7 @@ async def guest_update_booking(
             .where(TimeSlot.calendar_id == booking.time_slot.calendar_id)
         )
         result = await session.execute(stmt)
-        time_slot = result.unique().scalar_one_or_none()
+        time_slot = result.scalar_one_or_none()
         if time_slot is None:
             raise TimeSlotNotFoundError()
         booking.time_slot_id = time_slot.id
@@ -386,6 +463,8 @@ async def guest_update_booking(
     if payload.description is not None:
         booking.description = payload.description
     if payload.when is not None:
+        if payload.when.weekday() not in booking.time_slot.weekdays:
+            raise TimeSlotNotFoundError()
         booking.when = payload.when
     await session.commit()
     await session.refresh(booking)
@@ -414,7 +493,7 @@ async def update_booking_status(
         .where(TimeSlot.calendar_id == user.calendar.id)
     )
     result = await session.execute(stmt)
-    booking = result.unique().scalar_one_or_none()
+    booking = result.scalar_one_or_none()
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
 
@@ -424,6 +503,37 @@ async def update_booking_status(
     booking.attendance_status = payload.attendance_status
     await session.commit()
     await session.refresh(booking)
+    return booking
+
+
+@router.delete(
+    "/guest-bookings/{booking_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def cancel_guest_booking(
+        user: CurrentUserDep,
+        session: DbSessionDep,
+        booking_id: int,
+        now: UtcNow,
+) -> None:
+    stmt = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .where(Booking.guest_id == user.id)
+    )
+    result = await session.execute(stmt)
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
+
+    if booking.when <= now.date():
+        raise PastBookingError()
+
+    if booking.attendance_status != AttendanceStatus.CANCELLED.value:
+        booking.attendance_status = AttendanceStatus.CANCELLED.value
+        await session.commit()
+        await session.refresh(booking)
+
     return booking
 
 
@@ -445,7 +555,7 @@ async def upload_booking_files(
         .where(Booking.guest_id == user.id)
     )
     result = await session.execute(stmt)
-    booking = result.unique().scalar_one_or_none()
+    booking = result.scalar_one_or_none()
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예약 내역이 없습니다.")
 
@@ -457,3 +567,48 @@ async def upload_booking_files(
     await session.commit()
     await session.refresh(booking, ["files"])
     return booking
+
+
+@router.get(
+    "/time-slots/{host_username}",
+    status_code=status.HTTP_200_OK,
+    response_model=list[TimeSlotOut],
+)
+async def get_host_timeslots(
+        host_username: str,
+        session: DbSessionDep,
+) -> list[TimeSlotOut]:
+    stmt = (
+        select(User)
+        .where(User.username == host_username)
+        .where(User.is_active.is_(true()))
+        .where(User.is_host.is_(true()))
+    )
+    result = await session.execute(stmt)
+    host = result.scalar_one_or_none()
+    if host is None or host.calendar is None:
+        raise HostNotFoundError()
+
+    stmt = select(TimeSlot).where(TimeSlot.calendar_id == host.calendar.id)
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+@router.get(
+    "/calendar/{host_username}/bookings/stream",
+    status_code=status.HTTP_200_OK,
+)
+async def host_calendar_bookings_stream(
+        host_username: str,
+        session: DbSessionDep,
+        year: Annotated[int, Query(ge=2024, le=2025)],
+        month: Annotated[int, Query(ge=1, le=12)],
+) -> StreamingResponse:
+    async def _stream_bookings():
+        yield ""
+    return StreamingResponse(
+        _stream_bookings(),
+        media_type="application/x-ndjson",
+        status_code=status.HTTP_200_OK,
+    )
+

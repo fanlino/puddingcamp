@@ -2,19 +2,13 @@ from datetime import date, time
 from typing import Annotated
 
 from fastapi_storages import StorageFile
+from pydantic import AwareDatetime, EmailStr, AfterValidator, computed_field, model_validator
 from sqlmodel import SQLModel, Field
-from pydantic import AwareDatetime, EmailStr, AfterValidator, PlainSerializer, WithJsonSchema
-
-from appserver.apps.calendar.enums import AttendanceStatus
-
-# StorageFile을 문자열로 직렬화하고 JSON 스키마는 string으로 정의
-StorageFileStr = Annotated[
-    StorageFile,
-    PlainSerializer(lambda x: str(x), return_type=str),
-    WithJsonSchema({"type": "string"}, mode="serialization"),
-]
+from sqlmodel.main import SQLModelConfig
+from appserver.apps.account.schemas import UserOut
 from appserver.libs.collections.sort import deduplicate_and_sort
-from pydantic import model_validator
+
+from .enums import AttendanceStatus
 
 
 class CalendarOut(SQLModel):
@@ -34,8 +28,8 @@ Topics = Annotated[list[str], AfterValidator(deduplicate_and_sort)]
 
 class CalendarCreateIn(SQLModel):
     topics: Topics = Field(min_length=1, description="게스트와 나눌 주제들")
-    description: str = Field(min_length=1, description="게스트에게 보여줄 설명")
-    google_calendar_id: EmailStr = Field(description="Google Calendar ID")
+    description: str = Field(min_length=10, description="게스트에게 보여줄 설명")
+    google_calendar_id: EmailStr = Field(min_length=90, description="Google Calendar ID")
 
 
 class CalendarUpdateIn(SQLModel):
@@ -67,24 +61,25 @@ def validate_weekdays(weekdays: list[int]) -> list[int]:
 Weekdays = Annotated[list[int], AfterValidator(validate_weekdays)]
 
 
-class TimeSlotOut(SQLModel):
-    start_time: time
-    end_time: time
-    weekdays: list[int]
-    created_at: AwareDatetime
-    updated_at: AwareDatetime
-
-
 class TimeSlotCreateIn(SQLModel):
     start_time: time
     end_time: time
     weekdays: Weekdays
 
     @model_validator(mode="after")
-    def validate_weekdays(self):
+    def validate_time_slot(self):
         if self.start_time >= self.end_time:
             raise ValueError("시작 시간은 종료 시간보다 빨라야 합니다.")
         return self
+
+
+class TimeSlotOut(SQLModel):
+    id: int
+    start_time: time
+    end_time: time
+    weekdays: list[int]
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 class BookingCreateIn(SQLModel):
@@ -96,9 +91,11 @@ class BookingCreateIn(SQLModel):
 
 class BookingFileOut(SQLModel):
     id: int
-    file: StorageFileStr
+    file: StorageFile
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = SQLModelConfig(
+        arbitrary_types_allowed=True,
+    )
 
 
 class BookingOut(SQLModel):
@@ -107,14 +104,16 @@ class BookingOut(SQLModel):
     topic: str
     description: str
     time_slot: TimeSlotOut
+    host: UserOut
     attendance_status: AttendanceStatus
     files: list[BookingFileOut]
     created_at: AwareDatetime
     updated_at: AwareDatetime
 
 
-class HostBookingStatusUpdateIn(SQLModel):
-    attendance_status: AttendanceStatus
+class PaginatedBookingOut(SQLModel):
+    bookings: list[BookingOut]
+    total_count: int
 
 
 class SimpleBookingOut(SQLModel):
@@ -132,3 +131,7 @@ class GuestBookingUpdateIn(SQLModel):
     description: str | None = Field(default=None, description="예약 설명")
     when: date | None = Field(default=None, description="예약 일자")
     time_slot_id: int | None = Field(default=None, description="타임슬롯 ID")
+
+
+class HostBookingStatusUpdateIn(SQLModel):
+    attendance_status: AttendanceStatus
