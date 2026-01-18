@@ -77,7 +77,7 @@ class TimeSlot(SQLModel, table=True):
         sa_relationship_kwargs={"lazy": "joined"},
     )
 
-    bookings: list[Booking] = Relationship(back_populates="time_slot")
+    bookings: list["Booking"] = Relationship(back_populates="time_slot")
 
     created_at: AwareDatetime = Field(
         default=None,
