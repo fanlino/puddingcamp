@@ -3,10 +3,16 @@ from typing import Annotated
 
 from fastapi_storages import StorageFile
 from sqlmodel import SQLModel, Field
-from pydantic import AwareDatetime, EmailStr, AfterValidator
-from sqlmodel._compat import SQLModelConfig
+from pydantic import AwareDatetime, EmailStr, AfterValidator, PlainSerializer, WithJsonSchema
 
 from appserver.apps.calendar.enums import AttendanceStatus
+
+# StorageFile을 문자열로 직렬화하고 JSON 스키마는 string으로 정의
+StorageFileStr = Annotated[
+    StorageFile,
+    PlainSerializer(lambda x: str(x), return_type=str),
+    WithJsonSchema({"type": "string"}, mode="serialization"),
+]
 from appserver.libs.collections.sort import deduplicate_and_sort
 from pydantic import model_validator
 
@@ -90,11 +96,9 @@ class BookingCreateIn(SQLModel):
 
 class BookingFileOut(SQLModel):
     id: int
-    file: StorageFile
+    file: StorageFileStr
 
-    model_config = SQLModelConfig(
-        arbitrary_types_allowed=True,
-    )
+    model_config = {"arbitrary_types_allowed": True}
 
 
 class BookingOut(SQLModel):
