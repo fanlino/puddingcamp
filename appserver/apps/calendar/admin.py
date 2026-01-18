@@ -8,6 +8,8 @@ from sqlmodel import Unicode, or_, cast, union
 from markupsafe import Markup
 from sqlalchemy.sql.expression import Select, select
 
+from appserver.libs.query import exact_match_list_json
+
 from appserver.db import engine
 from .models import Booking, BookingFile, Calendar, TimeSlot
 
@@ -128,41 +130,6 @@ class TimeSlotAdmin(ModelView, model=TimeSlot):
     }
 
 
-WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
-
-
-class TimeSlotAdmin(ModelView, model=TimeSlot):
-    category = "캘린더"
-    name = "타임슬롯"
-    name_plural = "타임슬롯"
-    icon = "fa-solid fa-clock"
-    column_list = [
-        TimeSlot.id,
-        TimeSlot.start_time,
-        TimeSlot.end_time,
-        TimeSlot.weekdays,
-        TimeSlot.created_at,
-        TimeSlot.updated_at,
-    ]
-    column_labels = {
-        TimeSlot.weekdays: "요일",
-        TimeSlot.start_time: "시작 시간",
-        TimeSlot.end_time: "종료 시간",
-        TimeSlot.created_at: "생성 일시",
-        TimeSlot.updated_at: "수정 일시",
-    }
-    form_columns = [TimeSlot.calendar, TimeSlot.weekdays, TimeSlot.start_time, TimeSlot.end_time]
-    column_formatters = {
-        TimeSlot.weekdays: lambda m, r: ", ".join([WEEKDAYS[w] for w in m.weekdays]),
-    }
-    form_ajax_refs = {
-        "calendar": {
-            "fields": ["id"],
-            "order_by": "id",
-        },
-    }
-
-
 class BookingAdmin(ModelView, model=Booking):
     category = "캘린더"
     name = "부킹"
@@ -197,6 +164,7 @@ class BookingAdmin(ModelView, model=Booking):
             "order_by": "id",
         },
     }
+
 
 def file_formatter(booking_file: BookingFile, *args, **kwargs) -> Markup:
     file = booking_file.file
