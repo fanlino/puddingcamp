@@ -1,22 +1,19 @@
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlmodel import select, func, update, delete, true
 from sqlalchemy.exc import IntegrityError
-from .exceptions import DuplicatedUsernameError, DuplicatedEmailError, PasswordMismatchError, UserNotFoundError
+from datetime import datetime, timedelta, timezone
 
 from appserver.db import DbSessionDep
 from .models import User
-from .deps import CurrentUserDep
-from .schemas import SignupPayload, UserOut, LoginPayload, UserDetailOut, UpdateUserPayload
-
-from fastapi.responses import JSONResponse
+from .exceptions import DuplicatedUsernameError, DuplicatedEmailError, PasswordMismatchError, UserNotFoundError
+from .schemas import LoginPayload, SignupPayload, UpdateUserPayload, UserDetailOut, UserOut
 from .utils import (
-    verify_password,
-    create_access_token,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
+    verify_password, 
+    create_access_token, 
+    ACCESS_TOKEN_EXPIRE_MINUTES
 )
-
+from .deps import CurrentUserDep
 from .constants import AUTH_TOKEN_COOKIE_NAME
 
 router = APIRouter(prefix="/account")
@@ -43,6 +40,7 @@ async def signup(payload: SignupPayload, session: DbSessionDep) -> User:
         raise DuplicatedUsernameError()
 
     user = User.model_validate(payload, from_attributes=True)
+
     session.add(user)
     try:
         await session.commit()
@@ -64,7 +62,6 @@ async def login(payload: LoginPayload, session: DbSessionDep) -> JSONResponse:
     if not is_valid:
         raise PasswordMismatchError()
 
-    # return user
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
@@ -72,16 +69,15 @@ async def login(payload: LoginPayload, session: DbSessionDep) -> JSONResponse:
             "display_name": user.display_name,
             "is_host": user.is_host,
         },
-        expires_delta=access_token_expires,
+        expires_delta=access_token_expires
     )
 
     response_data = {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": user.model_dump(mode="json", exclude={"hashed_password", "email"}),
+        "user": user.model_dump(mode="json", exclude={"hashed_password", "email"})
     }
 
-    # return JSONResponse(response_data)
     now = datetime.now(timezone.utc)
 
     res = JSONResponse(response_data, status_code=status.HTTP_200_OK)
@@ -91,7 +87,7 @@ async def login(payload: LoginPayload, session: DbSessionDep) -> JSONResponse:
         expires=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         httponly=True,
         secure=True,
-        samesite="strict",
+        samesite="strict"
     )
     return res
 
@@ -103,13 +99,13 @@ async def me(user: CurrentUserDep) -> User:
 
 @router.patch("/@me", response_model=UserDetailOut)
 async def update_user(
-        user: CurrentUserDep,
-        payload: UpdateUserPayload,
-        session: DbSessionDep
+    user: CurrentUserDep,
+    payload: UpdateUserPayload,
+    session: DbSessionDep
 ) -> User:
     updated_data = payload.model_dump(exclude_none=True, exclude={"password", "password_again"})
 
-    stmt = update(User).filter_by(username=user.username).values(**updated_data)
+    stmt = update(User).where(User.username == user.username).values(**updated_data)
     await session.execute(stmt)
     await session.commit()
     return user

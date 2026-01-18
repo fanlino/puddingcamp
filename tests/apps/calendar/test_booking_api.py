@@ -37,10 +37,10 @@ def valid_booking_payload(time_slot_tuesday: TimeSlot):
 
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_유효한_예약_신청_내용으로_예약_생성을_요청하면_예약_내용을_담아_HTTP_201_응답한다(
-        time_slot_tuesday: TimeSlot,
-        host_user: User,
-        client_with_guest_auth: TestClient,
-        valid_booking_payload: dict,
+    time_slot_tuesday: TimeSlot,
+    host_user: User,
+    client_with_guest_auth: TestClient,
+    valid_booking_payload: dict,
 ):
     response = client_with_guest_auth.post(
         f"/bookings/{host_user.username}",
@@ -59,9 +59,9 @@ async def test_유효한_예약_신청_내용으로_예약_생성을_요청하�
 
 
 async def test_호스트가_아닌_사용자에게_예약을_생성하면_HTTP_404_응답을_한다(
-        cute_guest_user: User,
-        client_with_guest_auth: TestClient,
-        valid_booking_payload: dict,
+    cute_guest_user: User,
+    client_with_guest_auth: TestClient,
+    valid_booking_payload: dict,
 ):
     response = client_with_guest_auth.post(
         f"/bookings/{cute_guest_user.username}",
@@ -81,11 +81,11 @@ async def test_호스트가_아닌_사용자에게_예약을_생성하면_HTTP_4
 )
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_존재하지_않는_시간대에_예약을_생성하면_HTTP_404_응답을_한다(
-        host_user: User,
-        client_with_guest_auth: TestClient,
-        time_slot_tuesday: TimeSlot,
-        time_slot_id_add: int,
-        target_date: date,
+    host_user: User,
+    client_with_guest_auth: TestClient,
+    time_slot_tuesday: TimeSlot,
+    time_slot_id_add: int,
+    target_date: date,
 ):
     payload = {
         "when": target_date.isoformat(),
@@ -100,9 +100,9 @@ async def test_존재하지_않는_시간대에_예약을_생성하면_HTTP_404_
 
 
 async def test_자기_자신에겐_예약_못하게_하기(
-        host_user: User,
-        client_with_auth: TestClient,
-        valid_booking_payload: dict,
+    host_user: User,
+    client_with_auth: TestClient,
+    valid_booking_payload: dict,
 ):
     response = client_with_auth.post(
         f"/bookings/{host_user.username}",
@@ -113,9 +113,9 @@ async def test_자기_자신에겐_예약_못하게_하기(
 
 
 async def test_과거_일자에_예약을_생성하면_HTTP_422_응답을_한다(
-        host_user: User,
-        client_with_auth: TestClient,
-        valid_booking_payload: dict,
+    host_user: User,
+    client_with_auth: TestClient,
+    valid_booking_payload: dict,
 ):
     response = client_with_auth.post(
         f"/bookings/{host_user.username}",
@@ -126,9 +126,9 @@ async def test_과거_일자에_예약을_생성하면_HTTP_422_응답을_한다
 
 
 async def test_중복_신청을_하면_HTTP_422_응답을_한다(
-        host_user: User,
-        client_with_guest_auth: TestClient,
-        valid_booking_payload: dict,
+    host_user: User,
+    client_with_guest_auth: TestClient,
+    valid_booking_payload: dict,
 ):
     response = client_with_guest_auth.post(
         f"/bookings/{host_user.username}",
@@ -145,8 +145,8 @@ async def test_중복_신청을_하면_HTTP_422_응답을_한다(
 
 @pytest.mark.usefixtures("charming_host_bookings")
 async def test_호스트는_페이지_단위로_자신에게_예약된_부킹_목록을_받는다(
-        client_with_auth: TestClient,
-        host_bookings: list[Booking],
+    client_with_auth: TestClient,
+    host_bookings: list[Booking],
 ):
     response = client_with_auth.get("/bookings", params={"page": 1, "page_size": 10})
 
@@ -161,11 +161,11 @@ async def test_호스트는_페이지_단위로_자신에게_예약된_부킹_�
 )
 @pytest.mark.usefixtures("charming_host_bookings")
 async def test_게스트는_호스트의_캘린더의_예약_내역을_월_단위로_받는다(
-        client_with_guest_auth: TestClient,
-        host_bookings: list[Booking],
-        host_user: User,
-        year: int,
-        month: int,
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    host_user: User,
+    year: int,
+    month: int,
 ):
     params = {
         "year": year,
@@ -187,12 +187,12 @@ async def test_게스트는_호스트의_캘린더의_예약_내역을_월_단�
     assert not not data
     assert len(data) == len(booking_dates)
     assert all([item["when"] in booking_dates for item in data])
-
+ 
 
 async def test_게스트는_자신의_캘린더의_예약_내역을_페이지_단위로_받는다(
-        client_with_guest_auth: TestClient,
-        host_bookings: list[Booking],
-        charming_host_bookings: list[Booking],
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    charming_host_bookings: list[Booking],
 ):
     response = client_with_guest_auth.get("/guest-calendar/bookings", params={"page": 1, "page_size": 50})
 
@@ -212,9 +212,9 @@ async def test_게스트는_자신의_캘린더의_예약_내역을_페이지_�
     ],
 )
 async def test_사용자는_특정_예약_내역_데이터를_받는다(
-        host_bookings: list[Booking],
-        client: TestClient,
-        expected_status_code: int,
+    host_bookings: list[Booking],
+    client: TestClient,
+    expected_status_code: int,
 ):
     response = client.get(f"/bookings/{host_bookings[0].id}")
 
@@ -234,9 +234,9 @@ async def test_사용자는_특정_예약_내역_데이터를_받는다(
 )
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_호스트는_자신에게_신청한_부킹에_대해_일자_타임슬롯을_변경할_수_있다(
-        payload: dict,
-        client_with_auth: TestClient,
-        host_bookings: list[Booking],
+    payload: dict,
+    client_with_auth: TestClient,
+    host_bookings: list[Booking],
 ):
     hooking = host_bookings[0]
     time_slot: TimeSlot = payload["time_slot"]
@@ -262,10 +262,10 @@ async def test_호스트는_자신에게_신청한_부킹에_대해_일자_타�
     ],
 )
 async def test_호스트는_다른_호스트의_타임슬롯으로_변경할_수_없다(
-        client_with_auth: TestClient,
-        host_bookings: list[Booking],
-        time_slot: TimeSlot,
-        expected_status_code: int,
+    client_with_auth: TestClient,
+    host_bookings: list[Booking],
+    time_slot: TimeSlot,
+    expected_status_code: int,
 ):
     response = client_with_auth.patch(
         f"/bookings/{host_bookings[0].id}",
@@ -282,16 +282,17 @@ async def test_호스트는_다른_호스트의_타임슬롯으로_변경할_수
     ],
 )
 async def test_게스트는_다른_호스트의_타임슬롯으로_변경할_수_없다(
-        client_with_guest_auth: TestClient,
-        host_bookings: list[Booking],
-        time_slot: TimeSlot,
-        expected_status_code: int,
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    time_slot: TimeSlot,
+    expected_status_code: int,
 ):
     response = client_with_guest_auth.patch(
         f"/guest-bookings/{host_bookings[0].id}",
         json={"time_slot_id": time_slot.id},
     )
     assert response.status_code == expected_status_code
+
 
 
 @pytest.mark.parametrize(
@@ -303,9 +304,9 @@ async def test_게스트는_다른_호스트의_타임슬롯으로_변경할_수
     ],
 )
 async def test_게스트는_자신의_부킹에_대해_주제_설명_일자_타임슬롯을_변경할_수_있다(
-        client_with_guest_auth: TestClient,
-        host_bookings: list[Booking],
-        payload: dict,
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    payload: dict,
 ):
     booking = host_bookings[0]
 
@@ -365,9 +366,9 @@ async def test_게스트는_자신의_부킹에_대해_주제_설명_일자_타�
     ],
 )
 async def test_호스트는_자신에게_신청한_부킹의_참석_상태를_변경할_수_있다(
-        client_with_auth: TestClient,
-        host_bookings: list[Booking],
-        attendance_status: AttendanceStatus,
+    client_with_auth: TestClient,
+    host_bookings: list[Booking],
+    attendance_status: AttendanceStatus,
 ):
     payload = {
         "attendance_status": attendance_status,
@@ -391,10 +392,10 @@ async def test_호스트는_자신에게_신청한_부킹의_참석_상태를_�
     ],
 )
 async def test_게스트는_자신의_부킹을_취소만_할_수_있다(
-        client_with_guest_auth: TestClient,
-        host_bookings: list[Booking],
-        booking_index: int,
-        expected_status_code: int,
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
+    booking_index: int,
+    expected_status_code: int,
 ):
     booking = host_bookings[booking_index]
     response = client_with_guest_auth.delete(f"/guest-bookings/{booking.id}")
@@ -402,8 +403,8 @@ async def test_게스트는_자신의_부킹을_취소만_할_수_있다(
 
 
 async def test_게스트는_자신이_신청한_부킹에_파일을_업로드할_수_있다(
-        client_with_guest_auth: TestClient,
-        host_bookings: list[Booking],
+    client_with_guest_auth: TestClient,
+    host_bookings: list[Booking],
 ):
     booking = host_bookings[-1]
 
@@ -433,9 +434,9 @@ async def test_게스트는_자신이_신청한_부킹에_파일을_업로드할
 )
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_부킹을_생성하면_호스트의_구글_캘린더에_일정을_생성한다(
-        host_user: User,
-        client_with_guest_auth: TestClient,
-        valid_booking_payload: dict,
+    host_user: User,
+    client_with_guest_auth: TestClient,
+    valid_booking_payload: dict,
 ):
     response = client_with_guest_auth.post(
         f"/bookings/{host_user.username}",
@@ -452,10 +453,10 @@ async def test_부킹을_생성하면_호스트의_구글_캘린더에_일정을
 )
 @pytest.mark.usefixtures("host_user_calendar")
 async def test_부킹을_변경하면_호스트의_구글_캘린더에_일정을_반영한다(
-        host_user: User,
-        client_with_guest_auth: TestClient,
-        valid_booking_payload: dict,
-        google_calendar_service: GoogleCalendarService,
+    host_user: User,
+    client_with_guest_auth: TestClient,
+    valid_booking_payload: dict,
+    google_calendar_service: GoogleCalendarService,
 ):
     response = client_with_guest_auth.post(
         f"/bookings/{host_user.username}",
@@ -484,10 +485,10 @@ async def test_부킹을_변경하면_호스트의_구글_캘린더에_일정을
     reason="GOOGLE_CALENDAR_ID is not set",
 )
 async def test_부킹을_삭제하면_호스트의_구글_캘린더에_일정을_삭제한다(
-        host_user: User,
-        client_with_guest_auth: TestClient,
-        google_calendar_service: GoogleCalendarService,
-        valid_booking_payload: dict,
+    host_user: User,
+    client_with_guest_auth: TestClient,
+    google_calendar_service: GoogleCalendarService,
+    valid_booking_payload: dict,
 ):
     response = client_with_guest_auth.post(
         f"/bookings/{host_user.username}",
@@ -502,4 +503,5 @@ async def test_부킹을_삭제하면_호스트의_구글_캘린더에_일정을
 
     event = await google_calendar_service.get_event(data["google_event_id"])
     assert event["status"] == "cancelled"
+
 

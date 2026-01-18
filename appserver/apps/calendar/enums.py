@@ -1,6 +1,5 @@
 import enum
 
-
 class AttendanceStatus(enum.StrEnum):
     """참석 상태 종류
     - SCHEDULED: 예정
@@ -16,4 +15,3 @@ class AttendanceStatus(enum.StrEnum):
     CANCELLED = enum.auto()
     SAME_DAY_CANCEL = enum.auto()
     LATE = enum.auto()
-

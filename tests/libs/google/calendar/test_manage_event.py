@@ -25,7 +25,7 @@ async def event(service: GoogleCalendarService):
     )
 
     yield event
-
+    
     await service.delete_event(event_id=event["id"])
 
 

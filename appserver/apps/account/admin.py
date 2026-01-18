@@ -9,10 +9,10 @@ from sqladmin import ModelView, fields
 from sqlmodel import select
 from sqlalchemy.sql.expression import Select, select
 
+from appserver.apps.account.enums import AccountStatus
 from appserver.apps.account.utils import hash_password
-from .enums import AccountStatus
 
-from .models import User, OAuthAccount
+from .models import OAuthAccount, User
 
 
 class UserAdmin(ModelView, model=User):
@@ -49,7 +49,8 @@ class UserAdmin(ModelView, model=User):
         User.created_at: "생성 일시",
         User.updated_at: "수정 일시",
     }
-    column_default_sort = (User.id, True)
+    column_default_sort = (User.created_at, True)
+
     form_columns = [
         User.email,
         User.username,
@@ -61,6 +62,9 @@ class UserAdmin(ModelView, model=User):
     form_overrides = {
         "email": wtf.EmailField,
     }
+    column_type_formatters = {
+        datetime: lambda v: v.strftime("%Y년 %m월 %d일 %H:%M:%S") if v else "-",
+    }
     form_ajax_refs = {
         "calendar": {
            "fields": ["id", "description"],
@@ -68,6 +72,7 @@ class UserAdmin(ModelView, model=User):
         },
     }
 
+    # 이중으로 암호화해싱을 하므로 주석 처리 함.
     # async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
     #     if is_created:
     #         data["hashed_password"] = hash_password(data["hashed_password"])
@@ -82,11 +87,18 @@ class UserAdmin(ModelView, model=User):
     async def update_model(self, request: Request, pk: str, data: dict) -> Any:
         async with self.session_maker() as session:
             obj: User = await session.get(User, pk)
-
+            
         if obj.hashed_password != data["hashed_password"]:
             data["hashed_password"] = hash_password(data["hashed_password"])
         return await super().update_model(request, pk, data)
 
+    async def on_model_delete(self, model: User, request: Request) -> None:
+        random_string = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+        model.username = f"deleted/{random_string}"
+        model.email = f"deleted/{random_string}@localhost"
+        model.hashed_password = ""
+        model.display_name = ""
+    
     async def delete_model(self, request: Request, pk: Any) -> None:
         async with self.session_maker() as session:
             obj: User = await session.get(User, pk)
@@ -106,7 +118,6 @@ class UserAdmin(ModelView, model=User):
             for oauth_account in result.scalars().all():
                 await session.delete(oauth_account)
             await session.commit()
-
 
     async def scaffold_form(self, rules: list[str] | None = None) -> Type[wtf.Form]:
         form = await super().scaffold_form(rules)

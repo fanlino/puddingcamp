@@ -137,6 +137,7 @@ class BookingAdmin(ModelView, model=Booking):
     column_list = [
         Booking.id,
         Booking.time_slot,
+        Booking.when,
         Booking.created_at,
         Booking.updated_at,
     ]
@@ -167,7 +168,7 @@ class BookingAdmin(ModelView, model=Booking):
 
 def file_formatter(booking_file: BookingFile, *args, **kwargs) -> Markup:
     file = booking_file.file
-    match os.path.splitext(file.name)[1]:
+    match os.path.splitext(file.name)[1]:    
         case ".jpg" | ".jpeg" | ".png" | ".gif" | ".bmp" | ".tiff" | ".ico" | ".webp":
             return Markup(f'<img src="/{file.path}" style="width: 100px; height: 100px;" />')
         case ".pdf":

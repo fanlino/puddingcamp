@@ -8,10 +8,10 @@ from sqlalchemy import cast, func
 
 
 def exact_match_list_json(
-        session: AsyncSession | Literal["sqlite", "postgresql"],
-        attr: InstrumentedAttribute,
-        value: Any,
-        target_type: Type,
+    session: AsyncSession | Literal["sqlite", "postgresql"],
+    attr: InstrumentedAttribute,
+    value: Any,
+    target_type: Type,
 ) -> Select:
     """JSON lookup하는 방식이 DBMS에 따라 다른 경우를 처리하기 위한 함수."""
 
@@ -27,7 +27,7 @@ def exact_match_list_json(
         return select(literal_column("1")).where(
             text(f"EXISTS (SELECT 1 FROM json_each({attr.key}) WHERE CAST(value AS TEXT) = :value)"),
         ).exists().params(value=str(value))
-
+    
     if is_postgresql:
         # JSON 타입인 경우 JSONB로 캐스팅
         if isinstance(attr.type, JSON):
@@ -45,5 +45,5 @@ def exact_match_list_json(
 
         # EXISTS를 사용하여 최종 쿼리 생성
         return exists(subquery).select()
-
+    
     raise ValueError(f"Unsupported database: {dialect_name}")

@@ -33,13 +33,13 @@ async def get_user(auth_token: str | None, db_session: AsyncSession) -> User | N
 
 
 async def get_current_user(
-        request: Request,
-        db_session: DbSessionDep,
+    request: Request,
+    db_session: DbSessionDep,
 ):
     raw_auth_token = request.cookies.get("auth_token") or request.headers.get("Authorization")
     if raw_auth_token is None:
         raise AuthNotProvidedError()
-
+    
     *__, auth_token = raw_auth_token.split(" ")
     user = await get_user(auth_token, db_session)
     if user is None:
@@ -51,8 +51,8 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 async def get_current_user_optional(
-        db_session: DbSessionDep,
-        auth_token: Annotated[str | None, Cookie()] = None,
+    db_session: DbSessionDep,
+    auth_token: Annotated[str | None, Cookie()] = None,
 ):
     user = await get_user(auth_token, db_session)
     return user

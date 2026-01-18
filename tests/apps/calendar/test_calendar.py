@@ -1,8 +1,9 @@
 import pytest
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from appserver.apps.calendar.exceptions import CalendarNotFoundError, HostNotFoundError
 from appserver.apps.account.models import User
-from appserver.apps.calendar.exceptions import HostNotFoundError, CalendarNotFoundError
 from appserver.apps.calendar.models import Calendar
 from appserver.apps.calendar.schemas import CalendarDetailOut, CalendarOut
 from appserver.apps.calendar.endpoints import host_calendar_detail
@@ -14,12 +15,12 @@ from appserver.apps.calendar.endpoints import host_calendar_detail
     (None, CalendarOut),
 ])
 async def test_호스트인_사용자의_username_으로_캘린더_정보를_가져온다(
-        user_key: str | None,
-        expected_type: type[CalendarOut | CalendarDetailOut],
-        host_user: User,
-        host_user_calendar: Calendar,
-        guest_user: User,
-        db_session: AsyncSession,
+    user_key: str | None,
+    expected_type: type[CalendarOut | CalendarDetailOut],
+    host_user: User,
+    host_user_calendar: Calendar,
+    guest_user: User,
+    db_session: AsyncSession,
 ) -> CalendarOut | CalendarDetailOut:
     users = {
         "host_user": host_user,

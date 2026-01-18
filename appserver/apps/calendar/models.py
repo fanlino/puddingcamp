@@ -133,7 +133,7 @@ class Booking(SQLModel, table=True):
 
     files: list["BookingFile"] = Relationship(
         back_populates="booking",
-        sa_relationship_kwargs={"lazy": "joined"},
+        sa_relationship_kwargs={"lazy": "noload"},
     )
 
     google_event_id: str | None = Field(

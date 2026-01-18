@@ -1,7 +1,8 @@
 import random
 import string
 from typing import Self
-from pydantic import EmailStr, model_validator, AwareDatetime, computed_field
+
+from pydantic import AwareDatetime, EmailStr, model_validator, computed_field
 from sqlmodel import SQLModel, Field
 from .utils import hash_password
 
@@ -9,7 +10,7 @@ from .utils import hash_password
 class SignupPayload(SQLModel):
     username: str = Field(min_length=4, max_length=40, description="사용자 계정 ID")
     email: EmailStr = Field(unique=True, max_length=128, description="사용자 이메일")
-    display_name: str | None = Field(default=None, max_length=40, description="사용자 표시명")
+    display_name: str = Field(min_length=4, max_length=40, description="사용자 표시 이름")
     password: str = Field(min_length=8, max_length=128, description="사용자 비밀번호")
     password_again: str = Field(min_length=8, max_length=128, description="사용자 비밀번호 확인")
 
@@ -21,10 +22,15 @@ class SignupPayload(SQLModel):
 
     @model_validator(mode="before")
     @classmethod
-    def generate_display_name(cls, data: dict) -> dict:
+    def generate_display_name(cls, data: dict):
         if not data.get("display_name"):
-            data["display_name"] = "".join(random.sample(string.ascii_letters + string.digits, k=8))
+            data["display_name"] = "".join(random.choices(string.ascii_letters + string.digits, k=8))
         return data
+
+    @computed_field
+    @property
+    def hashed_password(self) -> str:
+        return hash_password(self.password)
 
 
 class UserOut(SQLModel):
@@ -33,15 +39,15 @@ class UserOut(SQLModel):
     is_host: bool
 
 
-class LoginPayload(SQLModel):
-    username: str = Field(min_length=4, max_length=40)
-    password: str = Field(min_length=8, max_length=128)
-
-
 class UserDetailOut(UserOut):
     email: EmailStr
     created_at: AwareDatetime
     updated_at: AwareDatetime
+
+
+class LoginPayload(SQLModel):
+    username: str = Field(min_length=4, max_length=40)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class UpdateUserPayload(SQLModel):
@@ -51,9 +57,9 @@ class UpdateUserPayload(SQLModel):
     password_again: str | None = Field(default=None, min_length=8, max_length=128)
 
     @model_validator(mode="after")
-    def check_all_fields_none(self) -> Self:
+    def check_all_fields_are_none(self) -> Self:
         if not self.model_dump(exclude_none=True):
-            raise ValueError("최소 하나의 필드는 반드시 제공되어야 합니다. ")
+            raise ValueError("최소 하나의 필드는 반드시 제공되어야 합니다.")
         return self
 
     @model_validator(mode="after")

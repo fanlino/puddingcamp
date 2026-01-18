@@ -7,4 +7,3 @@ from appserver.libs.datetime.datetime import utcnow
 
 
 UtcNow = Annotated[datetime, Depends(utcnow)]
-

@@ -10,4 +10,4 @@ wheels/
 .venv
 
 .idea/
-/calendar-booking.json
+/calendar-booking-service-account-credentials.json

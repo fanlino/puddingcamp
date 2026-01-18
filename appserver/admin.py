@@ -12,7 +12,6 @@ from appserver.apps.account.admin import OAuthAccountAdmin, UserAdmin
 from appserver.apps.calendar.admin import BookingAdmin, BookingFileAdmin, CalendarAdmin, TimeSlotAdmin
 from appserver.db import use_session
 
-
 def include_admin_views(admin: Admin):
     admin.add_view(UserAdmin)
     admin.add_view(CalendarAdmin)
@@ -35,10 +34,10 @@ class AdminAuthentication(AuthenticationBackend):
                     data = ujson.loads(res.body)
                 except ujson.JSONDecodeError:
                     return False
-
+                
                 request.session.update({"token": data["access_token"]})
                 return True
-
+        
         return False
 
     async def logout(self, request: Request) -> bool:

@@ -118,6 +118,7 @@ class PaginatedBookingOut(SQLModel):
 
 
 class SimpleBookingOut(SQLModel):
+    id: int
     when: date
     time_slot: TimeSlotOut
 
@@ -136,6 +137,7 @@ class GuestBookingUpdateIn(SQLModel):
 
 class HostBookingStatusUpdateIn(SQLModel):
     attendance_status: AttendanceStatus
+
 
 
 class GoogleCalendarTimeSlot(SQLModel):
@@ -176,3 +178,4 @@ class GoogleCalendarEventOut(SQLModel):
         if start_date := self.start.get("date"):
             return date.fromisoformat(start_date)
         return datetime.fromisoformat(self.start.get("dateTime")).date()
+    

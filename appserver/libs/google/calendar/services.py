@@ -8,16 +8,17 @@ from googleapiclient.errors import HttpError
 
 from .schemas import CalendarEvent, Reminder
 
+
 BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
 
-GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_PATH = BASE_DIR / "calendar-booking.json"
+GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_PATH = BASE_DIR / "calendar-booking-service-account-credentials.json"
 
 
 class GoogleCalendarService:
     def __init__(
-            self,
-            default_google_calendar_id: str,
-            credentials_path: Optional[Path] = GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_PATH,
+        self,
+        default_google_calendar_id: str,
+        credentials_path: Optional[Path] = GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_PATH,
     ):
         self.credentials_path = credentials_path
         self.default_google_calendar_id = default_google_calendar_id
@@ -34,16 +35,16 @@ class GoogleCalendarService:
         return build("calendar", "v3", credentials=credentials)
 
     def make_event_body(
-            self,
-            start_datetime: datetime,
-            end_datetime: datetime,
-            summary: Optional[str] = None,
-            conference: Optional[dict] = None,
-            location: Optional[str] = None,
-            description: Optional[str] = None,
-            reminder: Optional[Reminder] = None,
-            timezone: Optional[str] = "Asia/Seoul",
-            send_update: Literal["all", "externalOnly", "none"] = "all",
+        self,
+        start_datetime: datetime,
+        end_datetime: datetime,
+        summary: Optional[str] = None,
+        conference: Optional[dict] = None,
+        location: Optional[str] = None,
+        description: Optional[str] = None,
+        reminder: Optional[Reminder] = None,
+        timezone: Optional[str] = "Asia/Seoul",
+        send_update: Literal["all", "externalOnly", "none"] = "all",
     ) -> dict:
         event = {}
 
@@ -72,18 +73,18 @@ class GoogleCalendarService:
         return event
 
     async def create_event(
-            self,
-            summary: str,
-            start_datetime: datetime,
-            end_datetime: datetime,
-            *,
-            google_calendar_id: Optional[str] = None,
-            conference: Optional[dict] = None,
-            location: Optional[str] = None,
-            description: Optional[str] = None,
-            reminder: Optional[Reminder] = None,
-            timezone: Optional[str] = "Asia/Seoul",
-            send_update: Literal["all", "externalOnly", "none"] = "all",
+        self,
+        summary: str,
+        start_datetime: datetime,
+        end_datetime: datetime,
+        *,
+        google_calendar_id: Optional[str] = None,
+        conference: Optional[dict] = None,
+        location: Optional[str] = None,
+        description: Optional[str] = None,
+        reminder: Optional[Reminder] = None,
+        timezone: Optional[str] = "Asia/Seoul",
+        send_update: Literal["all", "externalOnly", "none"] = "all",
     ) -> CalendarEvent | None:
         event = self.make_event_body(
             start_datetime,
@@ -117,10 +118,10 @@ class GoogleCalendarService:
         return None
 
     async def event_list(
-            self,
-            time_min: datetime,
-            time_max: datetime,
-            google_calendar_id: Optional[str] = None,
+        self,
+        time_min: datetime,
+        time_max: datetime,
+        google_calendar_id: Optional[str] = None,
     ) -> list[CalendarEvent]:
         google_calendar_id = google_calendar_id or self.default_google_calendar_id
 
@@ -138,9 +139,9 @@ class GoogleCalendarService:
         return events_result.get("items", [])
 
     async def delete_event(
-            self,
-            event_id: str,
-            google_calendar_id: Optional[str] = None,
+        self,
+        event_id: str,
+        google_calendar_id: Optional[str] = None,
     ) -> bool:
         google_calendar_id = google_calendar_id or self.default_google_calendar_id
         try:
@@ -153,19 +154,19 @@ class GoogleCalendarService:
             return False
 
     async def update_event(
-            self,
-            event_id: str,
-            start_datetime: datetime,
-            end_datetime: datetime,
-            google_calendar_id: Optional[str] = None,
-            *,
-            summary: Optional[str] = None,
-            conference: Optional[dict] = None,
-            location: Optional[str] = None,
-            description: Optional[str] = None,
-            reminder: Optional[Reminder] = None,
-            timezone: Optional[str] = "Asia/Seoul",
-            send_update: Literal["all", "externalOnly", "none"] = "all",
+        self,
+        event_id: str,
+        start_datetime: datetime,
+        end_datetime: datetime,
+        google_calendar_id: Optional[str] = None,
+        *,
+        summary: Optional[str] = None,
+        conference: Optional[dict] = None,
+        location: Optional[str] = None,
+        description: Optional[str] = None,
+        reminder: Optional[Reminder] = None,
+        timezone: Optional[str] = "Asia/Seoul",
+        send_update: Literal["all", "externalOnly", "none"] = "all",
     ) -> bool:
         event = self.make_event_body(
             start_datetime,
@@ -178,7 +179,7 @@ class GoogleCalendarService:
             timezone=timezone,
             send_update=send_update,
         )
-
+       
         google_calendar_id = google_calendar_id or self.default_google_calendar_id
         try:
             self.service.events().update(
@@ -192,9 +193,9 @@ class GoogleCalendarService:
             return False
 
     async def get_event(
-            self,
-            event_id: str,
-            google_calendar_id: Optional[str] = None,
+        self,
+        event_id: str,
+        google_calendar_id: Optional[str] = None,
     ) -> CalendarEvent | None:
         google_calendar_id = google_calendar_id or self.default_google_calendar_id
         try:

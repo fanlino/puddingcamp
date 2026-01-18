@@ -90,3 +90,4 @@ class CalendarEvent(SQLModel):
     summary: str
     updated: str  # ISO 8601
 
+

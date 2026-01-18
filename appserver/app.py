@@ -11,11 +11,10 @@ from .db import engine
 
 app = FastAPI()
 
-
 def include_routers(_app: FastAPI):
     _app.include_router(account_router)
     _app.include_router(calendar_router)
-
+    
     _app.mount("/static", StaticFiles(directory="static"), name="static")
     _app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

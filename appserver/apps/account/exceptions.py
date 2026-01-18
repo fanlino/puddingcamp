@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 class DuplicatedUsernameError(HTTPException):
     def __init__(self):
         super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="중복된 계정 ID입니다.",
         )
 
@@ -12,7 +12,7 @@ class DuplicatedUsernameError(HTTPException):
 class DuplicatedEmailError(HTTPException):
     def __init__(self):
         super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="중복된 E-mail 주소입니다.",
         )
 
@@ -41,21 +41,12 @@ class InvalidTokenError(HTTPException):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-
 class ExpiredTokenError(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="만료된 인증 토큰입니다.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
-
-
-class TimeSlotOverlapError(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="겹치는 시간대가 이미 존재합니다.",
         )
 
 

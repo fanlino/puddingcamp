@@ -1,8 +1,6 @@
-import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
-pytest.skip("이 테스트 파일은 현재 환경에서 실행하지 않음", allow_module_level=True)
 
 async def test_회원가입_성공(client: TestClient):
     payload = {
@@ -34,7 +32,6 @@ async def test_응답_결과에는_username_display_name_is_host_만_출력한�
 
     data = response.json()
     assert response.status_code == status.HTTP_201_CREATED
-
     response_keys = frozenset(data.keys())
     expected_keys = frozenset(["username", "display_name", "is_host"])
     assert response_keys == expected_keys
